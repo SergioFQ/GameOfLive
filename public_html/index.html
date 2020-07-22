@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<!--Práctica 2 de Fundamentos de Tecnología de Videojuegos realizado por Sergio Fernández Quidiello y Pablo López Pérez-Esparza-->
+<html>
+    <head>
+        <title>TODO supply a title</title>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style>
+            canvas{
+                margin:0 px;
+                padding: 0 px;
+                border: 1px solid black;
+                background-color: lightblue;
+            }
+            #info{
+                background-color: bisque;
+            }
+        </style>
+    </head>
+
+    <body style="background-color: lightseagreen">
+        <p>Proyecto realizado por Sergio Fernández Quidiello y Pablo López Pérez-Esparza</p>
+        <p>Bibliografía utilizada:
+            <br/>Logo del juego recuperado de: <a href="https://timkrief.itch.io/life-the-game-of-chance">https://timkrief.itch.io/life-the-game-of-chance</a>
+            <br/>Sonido al hacer click en el mundo recuperado de: <a href="https://www.youtube.com/watch?v=-uyrLs__go4">https://www.youtube.com/watch?v=-uyrLs__go4</a>
+            <br/>Para mas información sobre el juego: <a href="https://es.wikipedia.org/wiki/Juego_de_la_vida">https://es.wikipedia.org/wiki/Juego_de_la_vida</a>
+        </p>
+        <div><canvas id="logo" width="400" height="133"></canvas></div>
+        <div>
+            <canvas id="tablero" height="400" width="400">Tu navegador no soporta canvas</canvas>
+            <canvas id="info" height="400" width="400"></canvas>
+        </div>
+        <p id="parrafo"></p>
+        <p id="parrafo2"></p>
+        <p><button  onclick="controlTiempo(1)">Play</button>
+            <button onclick="controlTiempo(2)">Pause</button>
+            <button onclick="redimensionar()">Cambiar tamaño</button>
+            <button onclick="cambiarVelocidad()">Cambiar velocidad</button></p>
+        <audio id="ping"><source src="ping.mp3"/></audio>
+
+
+        <script>
+            "use strict";
+
+            var contexto = document.getElementById("tablero").getContext("2d");
+            var contexto2 = document.getElementById("logo").getContext("2d");
+            var informacion = document.getElementById("info").getContext("2d");
+            var imagen = document.getElementById("logo");
+            var parrafo = document.getElementById("parrafo");
+            var parrafo2 = document.getElementById("parrafo2");
+            var audio = document.getElementById('ping');
+            document.getElementById("tablero").addEventListener("mousemove", raton, true);
+            document.getElementById("tablero").addEventListener("mouseout", raton, true);
+            document.getElementById("tablero").addEventListener("click", raton, true);
+
+            informacion.font = "30px Impact";
+            informacion.fillText("El juego de la vida", 80, 30);
+            informacion.font = "15px Georgia";
+            informacion.fillText("Conway´s Game of life. Este juego fue creado en 1970", 10, 70);
+            informacion.fillText("por  el británico John Horton Conway y publicado en la", 10, 90);
+            informacion.fillText("revista Scientific American.Desde un punto de vista ", 10, 110);
+            informacion.fillText("teórico, es interesante porque es equivalente a una ", 10, 130);
+            informacion.fillText("máquina universal de Turing, es decir, todo lo que se", 10, 150);
+            informacion.fillText("puede computar algorítmicamente se puede computar en ", 10, 170);
+            informacion.fillText("el juego de la vida.", 10, 190);
+            informacion.font = "20px Times New Roman";
+            informacion.fillText("Disfruta del juego de la vida.", 10, 250);
+
+
+
+            var mundo = new Mundo(40);
+            var velocidad = 250;
+            var playPause = false;
+            var time;
+            var time2 = 0;
+            parrafo.innerHTML = "La simulación lleva " + time2 + " pasos";
+            requestAnimationFrame(dibujarTablero);
+            cargaImagen(contexto2, "logo.jpg");
+
+            /*
+             * Mediante este método cambiaremos el tamaño del canvas y del mundo(array de células)
+             * @returns {undefined}
+             */
+            function redimensionar() {
+                alert("El tamaño del mundo debe ser menor que el canvas para evitar aberraciones visuales");
+                var n = prompt("Nuevo tamaño del canvas", "");
+                contexto.canvas.width = n;
+                contexto.canvas.height = n;
+                var n2 = prompt("Nuevo tamaño del mundo", "");
+                while (n2 >= n) {
+                    n2 = prompt("Nuevo tamaño del mundo(el mundo debe ser menor que el canvas)", "");
+                }
+                mundo = new Mundo(n2);
+                controlTiempo(2);
+                time2 = 0;
+            }
+            ;
+            /*
+             * Mediante este método cambiaremos la velocidad de la simulación
+             * @returns {undefined}
+             */
+            function cambiarVelocidad() {
+                velocidad = prompt("Nuevo valor para la velocidad(cuanto más alto sea el valor introducido, menor será la velocidad)", "");
+                controlTiempo(2);
+            }
+            /*
+             * Este método será el cual cargue el logo del juego
+             * @param {type} contexto2
+             * @param {type} nombre
+             * @returns {undefined}
+             */
+            function cargaImagen(contexto2, nombre) {
+                var imagen = new Image();
+                imagen.src = nombre;
+                imagen.onload = function () {
+                    var ancho = document.getElementById("logo").width;
+                    var alto = document.getElementById("logo").height;
+                    contexto2.drawImage(imagen, 0, 0, ancho, alto);
+                }
+            }
+            ;
+
+
+            /**
+             * Nuestro objeto célula
+             * @returns {undefined}
+             */
+            function Celula() {
+                this.estado = "muerta";    //estado en el que se encuentra la célula(viva, muerta, casiViva o casiMuerta)
+                this.tiempoViva = 0; //tiempo que lleva viva la celula. Empieza en 0
+            }
+            ;
+
+            /*
+             * Este será nuestro tablero con todos los cuadrados y células
+             * @param {type} ancho
+             * @param {type} alto
+             * @returns {undefined}
+             */
+
+            function Mundo(numCelulaDim) {
+                this.numCelulaDim = numCelulaDim;
+                this.anchoMundo = contexto.canvas.width;
+                this.altoMundo = contexto.canvas.height;
+                //se crea la matriz bidimensional
+                this.matriz = new Array(this.numCelulaDim);
+
+                for (var i = 0; i < this.numCelulaDim; i++) {
+                    this.matriz[i] = new Array(this.numCelulaDim);
+                }
+
+                //rellenamos la matriz y pintamos
+                for (var i = 0; i < this.numCelulaDim; i++) {
+                    for (var j = 0; j < this.numCelulaDim; j++) {
+                        this.matriz[i][j] = new Celula();
+
+                    }
+                }
+
+
+
+            }
+            ;
+
+            /*
+             * Este método estará continuamente dibujando el tablero mientras comprueba si las células están o no vivas
+             * @returns {undefined}
+             */
+            function dibujarTablero() {
+                contexto.fillStyle = "crimson";
+                contexto.clearRect(0, 0, mundo.anchoMundo, mundo.altoMundo);
+                for (var i = 0; i < mundo.matriz.length; i++) {
+                    for (var j = 0; j < mundo.matriz[i].length; j++) {
+                        if ((mundo.matriz[i][j].estado == "viva") || (mundo.matriz[i][j].estado == "casiViva")) {
+                            contexto.fillRect(i * mundo.anchoMundo / mundo.numCelulaDim, j * mundo.altoMundo / mundo.numCelulaDim, mundo.anchoMundo / mundo.numCelulaDim, mundo.altoMundo / mundo.numCelulaDim);
+                        } else {
+                            contexto.strokeRect(i * mundo.anchoMundo / mundo.numCelulaDim, j * mundo.altoMundo / mundo.numCelulaDim, mundo.anchoMundo / mundo.numCelulaDim, mundo.altoMundo / mundo.numCelulaDim);
+                        }
+                    }
+                }
+                requestAnimationFrame(dibujarTablero);
+            }
+            ;
+
+            /*
+             * Este método contolará todos eventos de ratón
+             * @param {type} e
+             * @returns {undefined}
+             */
+            function raton(e) {
+                var text = "";
+                var canvas = this.getBoundingClientRect();
+                var coordX = e.pageX - canvas.left;
+                var coordY = e.pageY - canvas.top;
+                var coordMatrizX = Math.floor(coordX / (mundo.anchoMundo / mundo.numCelulaDim));
+                var coordMatrizY = Math.floor(coordY / (mundo.altoMundo / mundo.numCelulaDim));
+                switch (e.type) {
+                    case "mousemove":
+                        if ((coordX => 0) && (coordX < mundo.anchoMundo) && (coordY => 0) && (coordY < mundo.altoMundo)) {
+                            if (mundo.matriz[coordMatrizX][coordMatrizY].estado == "viva" || mundo.matriz[coordMatrizX][coordMatrizY].estado == "casiViva") {
+                                text = "La célula(" + coordMatrizX + "," + coordMatrizY + ") lleva " + mundo.matriz[coordMatrizX][coordMatrizY].tiempoViva + " pasos viva";
+                            } else {
+                                text = "La célula(" + coordMatrizX + "," + coordMatrizY + ") lleva " + mundo.matriz[coordMatrizX][coordMatrizY].tiempoViva + " pasos muerta";
+                            }
+                        } else {
+                            text = "Ninguna célula seleccionada";
+                        }
+                        break;
+                    case "mouseout":
+                        text = "Ninguna célula seleccionada";
+                        break;
+                    case "click":
+                        if (mundo.matriz[coordMatrizX][coordMatrizY].estado == "viva") {
+                            mundo.matriz[coordMatrizX][coordMatrizY].estado = "muerta";
+                        } else if (mundo.matriz[coordMatrizX][coordMatrizY].estado == "muerta") {
+                            mundo.matriz[coordMatrizX][coordMatrizY].estado = "viva";
+
+                        }
+                        audio.pause();  //aseguramos por si sigue sonando de haberle dado con anterioridad
+                        audio.currentTime = 0;
+                        audio.play();
+                        break;
+
+                }
+                parrafo2.innerHTML = text;
+            }
+            ;
+            /***
+             * Funcion que controla las funciones de los botones play y pause
+             * @param {type} id
+             * @returns {undefined}
+             */
+            function controlTiempo(id) {
+                if (playPause == false && id == 1) {
+                    playPause = true;
+                    temporizador();
+                }
+                if (playPause == true && id == 2) {
+                    playPause = false;
+                    pararTiempo();
+                }
+            }
+            /*
+             * Temporizador que irá llamando al método update()
+             * @returns {undefined}
+             */
+            function temporizador() {
+                time = setInterval(function () {
+                    update();
+                }, velocidad);
+
+            }
+            ;
+            /*
+             * Función para parar el tiempo
+             * @returns {undefined}
+             */
+            function pararTiempo() {
+                clearInterval(time);
+            }
+
+
+            /*
+             * Función para actualizar el estado de las células y el tiempo que llevan vivas
+             * @returns {undefined}
+             */
+            function update() {
+                var vidas;
+                var kaux;
+                var laux;
+
+                //localizamos las distintas células
+                for (var i = 0; i < mundo.matriz.length; i++) {
+                    for (var j = 0; j < mundo.matriz[i].length; j++) {
+                        vidas = 0;
+                        kaux = i;
+                        laux = j;
+
+
+                        //vemos las células de alrededor   
+                        for (var k = -1; k < 2; k++) {
+                            for (var l = -1; l < 2; l++) {
+                                kaux = i + k;
+                                laux = j + l;
+                                //casos izquierda
+                                if (kaux <= -1) {
+                                    kaux = mundo.matriz.length - 1;
+                                }
+                                //casos arriba
+                                if (laux <= -1) {
+                                    laux = mundo.matriz[i].length - 1;
+                                }
+                                //casos derecha
+                                if (kaux >= mundo.matriz.length) {
+                                    kaux = 0;
+                                }
+                                //casos derecha
+                                if (laux >= mundo.matriz[i].length) {
+                                    laux = 0;
+                                }
+                                //contamos las células vivas
+                                if ((mundo.matriz[kaux][laux] != mundo.matriz[i][j]) && (mundo.matriz[kaux][laux].estado == "viva" || mundo.matriz[kaux][laux].estado == "casiMuerta")) {
+                                    vidas++;
+                                }
+                            }
+                        }
+
+                        if ((mundo.matriz[i][j].estado == "muerta") && (vidas == 3)) {
+                            mundo.matriz[i][j].estado = "casiViva";
+                        } else if ((mundo.matriz[i][j].estado == "viva") && ((vidas < 2) || (vidas > 3))) {
+                            mundo.matriz[i][j].estado = "casiMuerta";
+                        }
+                    }
+                }
+                //actualizamos las células "casiViva" y "casiMuerta" a "viva" y "muerta"
+                for (var i = 0; i < mundo.matriz.length; i++) {
+                    for (var j = 0; j < mundo.matriz[i].length; j++) {
+
+                        if (mundo.matriz[i][j].estado == "casiViva") {
+                            mundo.matriz[i][j].estado = "viva";
+                            mundo.matriz[i][j].tiempoViva = 0;
+                        } else if (mundo.matriz[i][j].estado == "casiMuerta") {
+                            mundo.matriz[i][j].estado = "muerta";
+                            mundo.matriz[i][j].tiempoViva = 0;
+
+                        }
+                        if (mundo.matriz[i][j].estado == "viva") {
+                            mundo.matriz[i][j].tiempoViva++;
+                        }
+                        if (mundo.matriz[i][j].estado == "muerta") {
+                            mundo.matriz[i][j].tiempoViva++;
+                        }
+                    }
+                }
+                time2++;
+                parrafo.innerHTML = "La simulación lleva " + time2 + " pasos";
+
+            }
+            ;
+
+
+
+
+        </script>
+    </body>
+</html>

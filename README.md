@@ -6,7 +6,10 @@ The Game of Life, also known simply as Life, created by John Horton Conway in 19
 
 ![alt text](https://cdn.discordapp.com/attachments/407616787497091072/735464342903980082/unknown.png)
 
-This proyect was made in 2018 using HTML and JavaScript. 
+This proyect was made in 2018 using HTML and JavaScript in order to improve our knowledge about those languages. 
+
+## Run the Game
+To play the game, open the file **index.html** inside the folder called **public_html**
 
 ## Team
 **Sergio Fernández Quidiello:**
